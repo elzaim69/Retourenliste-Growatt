@@ -23,7 +23,7 @@
     <h2>Ladeliste scannen</h2>
 
     <button class="btn-main" onclick="startScanner('sendungsnummer')">≣ Seriennummer scannen</button>
-    <button class="btn-main" onclick="startScanner('empfaenger')">🧾 Empfängername scannen</button>
+    <button class="btn-main" onclick="startScanner('artikel')">🧾 Artikel scannen</button>
     <div id="reader"></div>
 
     <label>Sendungsnummer:</label>
@@ -33,13 +33,20 @@
     <select id="dienstleister">
       <option value="Defekt">Defekt</option>
       <option value="Keine Spannung">Keine Spannung</option>
-      <option value="keine Funktion">Keine funktion</option>
+      <option value="keine Funktion">Keine Funktion</option>
       <option value="Laut Kunde defekt">Laut Kunde defekt</option>
       <option value="schaltet zwischendurch ab">schaltet zwischendurch ab</option>
     </select>
 
-    <label>Empfängername:</label>
-    <input type="text" id="empfaenger" placeholder="Name des Empfängers">
+    <label>Artikel:</label>
+    <select id="artikel">
+      <option value="" disabled selected>Bitte wählen…</option>
+      <option>Akku</option>
+      <option>Display</option>
+      <option>Mainboard</option>
+      <option>Ladegerät</option>
+      <option>Zubehör</option>
+    </select>
 
     <button class="btn-main" onclick="addEntry()">Hinzufügen</button>
 
@@ -48,9 +55,9 @@
         <tr>
           <th>Datum</th>
           <th>Absender</th>
-          <th>Versanddienstleister</th>
+          <th>Grund der Rücksendung</th>
           <th>Paketnummer</th>
-          <th>Empfänger</th>
+          <th>Artikel</th>
         </tr>
       </thead>
       <tbody></tbody>
@@ -71,16 +78,19 @@
     function addEntry() {
       const sn = document.getElementById("sendungsnummer").value.trim();
       const dl = document.getElementById("dienstleister").value;
-      const empfaenger = document.getElementById("empfaenger").value.trim();
+      const artikel = document.getElementById("artikel").value;
       const datum = new Date().toLocaleDateString("de-DE");
-      if (!sn || !empfaenger) return alert("Bitte alle Felder ausfüllen");
-      data.push({ datum, sn, dl, empfaenger });
+
+      if (!sn || !artikel) return alert("Bitte Sendungsnummer und Artikel wählen/ausfüllen.");
+
+      data.push({ datum, sn, dl, artikel });
 
       const row = document.createElement("tr");
-      row.innerHTML = `<td>${datum}</td><td>ACTEC GmbH</td><td>${dl}</td><td>${sn}</td><td>${empfaenger}</td>`;
+      row.innerHTML = `<td>${datum}</td><td>ACTEC GmbH</td><td>${dl}</td><td>${sn}</td><td>${artikel}</td>`;
       listBody.appendChild(row);
+
       document.getElementById("sendungsnummer").value = "";
-      document.getElementById("empfaenger").value = "";
+      document.getElementById("artikel").value = "";
     }
 
     function generatePDF() {
@@ -92,8 +102,8 @@
       doc.text("Ladeliste", 105, 25, null, null, "center");
       doc.setTextColor(0, 0, 0);
 
-      const headers = [["DATUM", "Absender", "Versanddienstleister", "Paketnummer", "Empfänger"]];
-      const rows = data.map(entry => [entry.datum, "ACTEC GmbH", entry.dl, entry.sn, entry.empfaenger]);
+      const headers = [["DATUM", "Absender", "Grund der Rücksendung", "Paketnummer", "Artikel"]];
+      const rows = data.map(entry => [entry.datum, "ACTEC GmbH", entry.dl, entry.sn, entry.artikel]);
 
       doc.autoTable({
         head: headers,
@@ -112,9 +122,33 @@
       doc.save(filename);
     }
 
+    // Setzt gescannte Werte in Input oder Select (bei Select: wählt vorhandene Option oder legt neue an)
+    function setFieldValue(fieldId, value) {
+      const el = document.getElementById(fieldId);
+      if (!el) return;
+
+      if (el.tagName === "SELECT") {
+        // exakte Übereinstimmung?
+        const options = Array.from(el.options).map(o => o.value || o.text);
+        const foundIndex = options.findIndex(opt => String(opt).toLowerCase() === String(value).toLowerCase());
+        if (foundIndex >= 0) {
+          el.selectedIndex = foundIndex;
+        } else {
+          const opt = document.createElement("option");
+          opt.text = value;
+          opt.value = value;
+          el.add(opt);
+          el.value = value;
+        }
+      } else {
+        el.value = value;
+      }
+    }
+
     function startScanner(fieldId) {
       scanTarget = fieldId;
       const readerElem = document.getElementById("reader");
+
       if (scannerRunning) {
         html5QrCode.stop().then(() => {
           scannerRunning = false;
@@ -129,8 +163,8 @@
         { facingMode: "environment" },
         { fps: 10, qrbox: 250 },
         (decodedText, decodedResult) => {
-          document.getElementById(scanTarget).value = decodedText;
-          startScanner();
+          setFieldValue(scanTarget, decodedText);
+          startScanner(); // stoppt den Scanner
         },
         (errorMessage) => {}
       ).then(() => {
