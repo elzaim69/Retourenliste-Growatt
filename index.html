@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ladeliste Scanner</title>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <style>
+    body { font-family: sans-serif; background: #fff0f0; padding: 20px; }
+    .container { max-width: 600px; margin: auto; background: white; border-radius: 12px; padding: 20px; box-shadow: 0 0 20px rgba(255,0,0,0.1); }
+    h2 { text-align: center; margin-bottom: 20px; color: #c00000; }
+    button, select, input { font-size: 16px; margin: 10px 0; width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ccc; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { text-align: left; padding: 8px; border: 1px solid #ddd; }
+    th { background-color: #ffe5e5; }
+    .btn-main { background: #c00000; color: white; border: none; cursor: pointer; }
+    .btn-main:hover { background: #900000; }
+    #reader { width: 100%; margin-top: 20px; display: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Ladeliste scannen</h2>
+
+    <button class="btn-main" onclick="startScanner('sendungsnummer')">📦 Paketnummer scannen</button>
+    <button class="btn-main" onclick="startScanner('empfaenger')">🧾 Empfängername scannen</button>
+    <div id="reader"></div>
+
+    <label>Sendungsnummer:</label>
+    <input type="text" id="sendungsnummer" placeholder="Barcode hier scannen oder eingeben">
+
+    <label>Versanddienstleister:</label>
+    <select id="dienstleister">
+      <option value="DHL">DHL</option>
+      <option value="DPD">DPD</option>
+      <option value="GLS">GLS</option>
+      <option value="UPS">UPS</option>
+      <option value="Schenker">DB Schenker</option>
+    </select>
+
+    <label>Empfängername:</label>
+    <input type="text" id="empfaenger" placeholder="Name des Empfängers">
+
+    <button class="btn-main" onclick="addEntry()">Hinzufügen</button>
+
+    <table id="list">
+      <thead>
+        <tr>
+          <th>Datum</th>
+          <th>Absender</th>
+          <th>Versanddienstleister</th>
+          <th>Paketnummer</th>
+          <th>Empfänger</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <button class="btn-main" onclick="generatePDF()">Ladeliste abschließen</button>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+  <script>
+    const listBody = document.querySelector("#list tbody");
+    const data = [];
+    let html5QrCode;
+    let scannerRunning = false;
+    let scanTarget = "sendungsnummer";
+
+    function addEntry() {
+      const sn = document.getElementById("sendungsnummer").value.trim();
+      const dl = document.getElementById("dienstleister").value;
+      const empfaenger = document.getElementById("empfaenger").value.trim();
+      const datum = new Date().toLocaleDateString("de-DE");
+      if (!sn || !empfaenger) return alert("Bitte alle Felder ausfüllen");
+      data.push({ datum, sn, dl, empfaenger });
+
+      const row = document.createElement("tr");
+      row.innerHTML = `<td>${datum}</td><td>ACTEC GmbH</td><td>${dl}</td><td>${sn}</td><td>${empfaenger}</td>`;
+      listBody.appendChild(row);
+      document.getElementById("sendungsnummer").value = "";
+      document.getElementById("empfaenger").value = "";
+    }
+
+    function generatePDF() {
+      const doc = new window.jspdf.jsPDF();
+      doc.setFontSize(14);
+      doc.text("ACTEC GmbH", 105, 15, null, null, "center");
+      doc.setTextColor(200, 0, 0);
+      doc.setFontSize(16);
+      doc.text("Ladeliste", 105, 25, null, null, "center");
+      doc.setTextColor(0, 0, 0);
+
+      const headers = [["DATUM", "Absender", "Versanddienstleister", "Paketnummer", "Empfänger"]];
+      const rows = data.map(entry => [entry.datum, "ACTEC GmbH", entry.dl, entry.sn, entry.empfaenger]);
+
+      doc.autoTable({
+        head: headers,
+        body: rows,
+        startY: 35,
+        styles: { fontSize: 10, cellPadding: 3 },
+        headStyles: { fillColor: [255, 229, 229], textColor: [0, 0, 0] },
+        margin: { top: 30 }
+      });
+
+      const pageHeight = doc.internal.pageSize.height;
+      doc.setFontSize(12);
+      doc.text("Unterschrift Fahrer: _________________________________", 14, pageHeight - 20);
+
+      const filename = `ladeliste_${new Date().toISOString().split('T')[0]}.pdf`;
+      doc.save(filename);
+    }
+
+    function startScanner(fieldId) {
+      scanTarget = fieldId;
+      const readerElem = document.getElementById("reader");
+      if (scannerRunning) {
+        html5QrCode.stop().then(() => {
+          scannerRunning = false;
+          readerElem.style.display = "none";
+        });
+        return;
+      }
+
+      html5QrCode = new Html5Qrcode("reader");
+      readerElem.style.display = "block";
+      html5QrCode.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 250 },
+        (decodedText, decodedResult) => {
+          document.getElementById(scanTarget).value = decodedText;
+          startScanner();
+        },
+        (errorMessage) => {}
+      ).then(() => {
+        scannerRunning = true;
+      }).catch(err => {
+        alert("Kamera konnte nicht gestartet werden: " + err);
+      });
+    }
+  </script>
+</body>
+</html>
