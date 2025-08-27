@@ -22,12 +22,12 @@
   <div class="container">
     <h2>Ladeliste scannen</h2>
 
-    <button class="btn-main" onclick="startScanner('sendungsnummer')">≣ Seriennummer scannen</button>
+    <button class="btn-main" onclick="startScanner('Seriennummer')">≣ Seriennummer scannen</button>
     <button class="btn-main" onclick="startScanner('artikel')">🧾 Artikel scannen</button>
     <div id="reader"></div>
 
-    <label>Sendungsnummer:</label>
-    <input type="text" id="sendungsnummer" placeholder="Barcode hier scannen oder eingeben">
+    <label>Seriennummer:</label>
+    <input type="text" id="Seriennummer" placeholder="Barcode hier scannen oder eingeben">
 
     <label>Grund der Rücksendung:</label>
     <select id="dienstleister">
@@ -41,11 +41,15 @@
     <label>Artikel:</label>
     <select id="artikel">
       <option value="" disabled selected>Bitte wählen…</option>
-      <option>Akku</option>
-      <option>Display</option>
-      <option>Mainboard</option>
-      <option>Ladegerät</option>
-      <option>Zubehör</option>
+      <option>MIC 800</option>
+      <option>MIC 1000</option>
+      <option>MIC 1500</option>
+      <option>MIC 2000</option>
+      <option>MIC 2500</option>
+      <option>MIC 3000</option>
+      <option>NEO 800</option>
+      <option>NEO 1000</option>
+      <option>NEO 16000</option>
     </select>
 
     <button class="btn-main" onclick="addEntry()">Hinzufügen</button>
