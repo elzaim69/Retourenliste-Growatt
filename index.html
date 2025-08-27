@@ -76,15 +76,15 @@
     const data = [];
     let html5QrCode;
     let scannerRunning = false;
-    let scanTarget = "Seriennummer";
+    let scanTarget = "sendungsnummer";
 
     function addEntry() {
-      const sn = document.getElementById("Seriennummer").value.trim();
+      const sn = document.getElementById("sendungsnummer").value.trim();
       const dl = document.getElementById("dienstleister").value;
       const artikel = document.getElementById("artikel").value;
       const datum = new Date().toLocaleDateString("de-DE");
 
-      if (!sn || !artikel) return alert("Bitte Seriennummer und Artikel wählen/ausfüllen.");
+      if (!sn || !artikel) return alert("Bitte Sendungsnummer und Artikel wählen/ausfüllen.");
 
       data.push({ datum, sn, dl, artikel });
 
@@ -92,7 +92,7 @@
       row.innerHTML = `<td>${datum}</td><td>ACTEC GmbH</td><td>${dl}</td><td>${sn}</td><td>${artikel}</td>`;
       listBody.appendChild(row);
 
-      document.getElementById("Seriennummer").value = "";
+      document.getElementById("sendungsnummer").value = "";
       document.getElementById("artikel").value = "";
     }
 
@@ -125,10 +125,27 @@
       doc.save(filename);
     }
 
+    // Setzt gescannte Werte in Input oder Select (bei Select: wählt vorhandene Option oder legt neue an)
     function setFieldValue(fieldId, value) {
       const el = document.getElementById(fieldId);
       if (!el) return;
-      el.value = value;
+
+      if (el.tagName === "SELECT") {
+        // exakte Übereinstimmung?
+        const options = Array.from(el.options).map(o => o.value || o.text);
+        const foundIndex = options.findIndex(opt => String(opt).toLowerCase() === String(value).toLowerCase());
+        if (foundIndex >= 0) {
+          el.selectedIndex = foundIndex;
+        } else {
+          const opt = document.createElement("option");
+          opt.text = value;
+          opt.value = value;
+          el.add(opt);
+          el.value = value;
+        }
+      } else {
+        el.value = value;
+      }
     }
 
     function startScanner(fieldId) {
@@ -148,9 +165,9 @@
       html5QrCode.start(
         { facingMode: "environment" },
         { fps: 10, qrbox: 250 },
-        (decodedText) => {
+        (decodedText, decodedResult) => {
           setFieldValue(scanTarget, decodedText);
-          startScanner(); // stoppt den Scanner nach Scan
+          startScanner(); // stoppt den Scanner
         },
         (errorMessage) => {}
       ).then(() => {
