@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Ladeliste Scanner</title>
+  <title>Growatt Retouren Scanner</title>
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <style>
     body { font-family: sans-serif; background: #fff0f0; padding: 20px; }
@@ -20,7 +20,7 @@
 </head>
 <body>
   <div class="container">
-    <h2>Ladeliste scannen</h2>
+    <h2>Growatt Retouren scannen</h2>
 
     <button class="btn-main" onclick="toggleScanner('Seriennummer')">≣ Seriennummer scannen</button>
     <div id="reader"></div>
@@ -57,16 +57,15 @@
       <thead>
         <tr>
           <th>Datum</th>
-          <th>Absender</th>
           <th>Grund der Rücksendung</th>
-          <th>Paketnummer</th>
+          <th>Seriennummer</th>
           <th>Artikel</th>
         </tr>
       </thead>
       <tbody></tbody>
     </table>
 
-    <button class="btn-main" onclick="generatePDF()">Ladeliste abschließen</button>
+    <button class="btn-main" onclick="generatePDF()">PDF erzeugen</button>
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -79,8 +78,7 @@
     let scanTarget = "Seriennummer";
 
     function addEntry() {
-      const snInput = document.getElementById("Seriennummer");
-      const sn = snInput ? snInput.value.trim() : "";
+      const sn = document.getElementById("Seriennummer").value.trim();
       const dl = document.getElementById("dienstleister").value;
       const artikel = document.getElementById("artikel").value;
       const datum = new Date().toLocaleDateString("de-DE");
@@ -93,7 +91,7 @@
       data.push({ datum, sn, dl, artikel });
 
       const row = document.createElement("tr");
-      row.innerHTML = `<td>${datum}</td><td>ACTEC GmbH</td><td>${dl}</td><td>${sn}</td><td>${artikel}</td>`;
+      row.innerHTML = `<td>${datum}</td><td>${dl}</td><td>${sn}</td><td>${artikel}</td>`;
       listBody.appendChild(row);
 
       document.getElementById("Seriennummer").value = "";
@@ -102,30 +100,28 @@
 
     function generatePDF() {
       const doc = new window.jspdf.jsPDF();
-      doc.setFontSize(14);
-      doc.text("ACTEC GmbH", 105, 15, null, null, "center");
-      doc.setTextColor(200, 0, 0);
       doc.setFontSize(16);
-      doc.text("Ladeliste", 105, 25, null, null, "center");
+      doc.setTextColor(200, 0, 0);
+      doc.text("Growatt Retouren", 105, 20, null, null, "center");
       doc.setTextColor(0, 0, 0);
 
-      const headers = [["DATUM", "Absender", "Grund der Rücksendung", "Paketnummer", "Artikel"]];
-      const rows = data.map(entry => [entry.datum, "ACTEC GmbH", entry.dl, entry.sn, entry.artikel]);
+      const headers = [["DATUM", "Grund der Rücksendung", "Seriennummer", "Artikel"]];
+      const rows = data.map(entry => [entry.datum, entry.dl, entry.sn, entry.artikel]);
 
       doc.autoTable({
         head: headers,
         body: rows,
-        startY: 35,
+        startY: 30,
         styles: { fontSize: 10, cellPadding: 3 },
         headStyles: { fillColor: [255, 229, 229], textColor: [0, 0, 0] },
-        margin: { top: 30 }
+        margin: { top: 25 }
       });
 
       const pageHeight = doc.internal.pageSize.height;
       doc.setFontSize(12);
       doc.text("Unterschrift Fahrer: _________________________________", 14, pageHeight - 20);
 
-      const filename = `ladeliste_${new Date().toISOString().split('T')[0]}.pdf`;
+      const filename = `growatt_retouren_${new Date().toISOString().split('T')[0]}.pdf`;
       doc.save(filename);
     }
 
@@ -136,7 +132,6 @@
     }
 
     function toggleScanner(fieldId) {
-      // wenn bereits aktiv -> stoppen
       if (scannerRunning && html5QrCode) {
         html5QrCode.stop().then(() => {
           scannerRunning = false;
@@ -145,7 +140,6 @@
         return;
       }
 
-      // sonst starten
       scanTarget = fieldId || "Seriennummer";
       const readerElem = document.getElementById("reader");
       html5QrCode = new Html5Qrcode("reader");
@@ -156,7 +150,7 @@
         { fps: 10, qrbox: 250 },
         (decodedText) => {
           setFieldValue(scanTarget, decodedText);
-          toggleScanner(); // nach erfolgreichem Scan wieder schließen
+          toggleScanner(); // stoppt den Scanner nach Scan
         },
         () => {}
       ).then(() => {
