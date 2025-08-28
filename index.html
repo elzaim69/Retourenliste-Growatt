@@ -67,10 +67,14 @@
     </table>
 
     <button class="btn-main" onclick="generatePDF()">PDF erzeugen</button>
+    <button class="btn-main" onclick="generateExcel()">Excel erzeugen</button>
   </div>
 
+  <!-- Libraries -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
   <script>
     const listBody = document.querySelector("#list tbody");
     const data = [];
@@ -89,7 +93,7 @@
         return;
       }
 
-      data.push({ datum, sn, dl, artikel });
+      data.push({ datum, artikel, sn, dl });
 
       const row = document.createElement("tr");
       row.innerHTML = `<td>${datum}</td><td>${artikel}</td><td>${sn}</td><td>${dl}</td>`;
@@ -121,6 +125,21 @@
 
       const filename = `growatt_retouren_${new Date().toISOString().split('T')[0]}.pdf`;
       doc.save(filename);
+    }
+
+    function generateExcel() {
+      if (data.length === 0) {
+        alert("Keine Daten zum Exportieren vorhanden.");
+        return;
+      }
+      const worksheetData = [
+        ["DATUM", "ARTIKEL", "SERIENNUMMER", "GRUND"],
+        ...data.map(entry => [entry.datum, entry.artikel, entry.sn, entry.dl])
+      ];
+      const ws = XLSX.utils.aoa_to_sheet(worksheetData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Retouren");
+      XLSX.writeFile(wb, `growatt_retouren_${new Date().toISOString().split('T')[0]}.xlsx`);
     }
 
     function setFieldValue(fieldId, value) {
@@ -170,7 +189,7 @@
         config,
         (decodedText) => {
           setFieldValue(scanTarget, decodedText);
-          toggleScanner(); // sofort schließen
+          toggleScanner();
         },
         () => {}
       ).then(() => {
