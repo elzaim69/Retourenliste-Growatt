@@ -6,7 +6,7 @@
   <title>Growatt Retouren Scanner</title>
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <style>
-    body { font-family: sans-serif; background: #f0fff0; padding: 20px; } /* Hintergrund leicht grünlich */
+    body { font-family: sans-serif; background: #f0fff0; padding: 20px; } /* leicht grünlicher Hintergrund */
     .container { max-width: 600px; margin: auto; background: white; border-radius: 12px; padding: 20px; box-shadow: 0 0 20px rgba(0,128,0,0.1); }
     h2 { text-align: center; margin-bottom: 20px; color: #008000; }
     button, select, input { font-size: 16px; margin: 10px 0; width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ccc; }
@@ -20,7 +20,7 @@
 </head>
 <body>
   <div class="container">
-    <h2>Growatt Retouren scannen</h2>
+    <h2>Growatt Retouren</h2>
 
     <button class="btn-main" onclick="toggleScanner('Seriennummer')">≣ Seriennummer scannen</button>
     <div id="reader"></div>
@@ -57,9 +57,9 @@
       <thead>
         <tr>
           <th>Datum</th>
-          <th>Grund der Rücksendung</th>
-          <th>Seriennummer</th>
           <th>Artikel</th>
+          <th>Seriennummer</th>
+          <th>Grund der Rücksendung</th>
         </tr>
       </thead>
       <tbody></tbody>
@@ -91,7 +91,8 @@
       data.push({ datum, sn, dl, artikel });
 
       const row = document.createElement("tr");
-      row.innerHTML = `<td>${datum}</td><td>${dl}</td><td>${sn}</td><td>${artikel}</td>`;
+      // Reihenfolge: Datum | Artikel | Seriennummer | Grund
+      row.innerHTML = `<td>${datum}</td><td>${artikel}</td><td>${sn}</td><td>${dl}</td>`;
       listBody.appendChild(row);
 
       document.getElementById("Seriennummer").value = "";
@@ -105,8 +106,10 @@
       doc.text("Growatt Retouren", 105, 20, null, null, "center");
       doc.setTextColor(0, 0, 0);
 
-      const headers = [["DATUM", "Grund der Rücksendung", "Seriennummer", "Artikel"]];
-      const rows = data.map(entry => [entry.datum, entry.dl, entry.sn, entry.artikel]);
+      // Reihenfolge Header wie gewünscht
+      const headers = [["DATUM", "ARTIKEL", "SERIENNUMMER", "GRUND DER RÜCKSENDUNG"]];
+      // Reihenfolge Daten entsprechend
+      const rows = data.map(entry => [entry.datum, entry.artikel, entry.sn, entry.dl]);
 
       doc.autoTable({
         head: headers,
