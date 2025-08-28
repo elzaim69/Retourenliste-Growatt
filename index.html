@@ -137,7 +137,9 @@
       el.value = value;
     }
 
+    // >>> Performance-optimierter Scanner für 1D-Barcodes
     function toggleScanner(fieldId) {
+      // Bereits aktiv? -> stoppen
       if (scannerRunning && html5QrCode) {
         html5QrCode.stop().then(() => {
           scannerRunning = false;
@@ -146,17 +148,44 @@
         return;
       }
 
+      // Start
       scanTarget = fieldId || "Seriennummer";
       const readerElem = document.getElementById("reader");
       html5QrCode = new Html5Qrcode("reader");
       readerElem.style.display = "block";
 
+      // Breite, flache Scanbox für 1D-Barcodes
+      const qrbox = { width: 500, height: 180 };
+
+      const config = {
+        fps: 30,
+        qrbox,
+        aspectRatio: 1.7778, // 16:9 begünstigt Autofokus
+        rememberLastUsedCamera: true,
+        experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.QR_CODE
+        ],
+        // Höhere Auflösung + Autofokus (falls vom Browser umgesetzt)
+        videoConstraints: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          focusMode: "continuous"
+        }
+      };
+
       html5QrCode.start(
         { facingMode: "environment" },
-        { fps: 10, qrbox: 250 },
+        config,
         (decodedText) => {
           setFieldValue(scanTarget, decodedText);
-          toggleScanner(); // stoppt den Scanner nach Scan
+          // Nach erstem Treffer sofort schließen
+          toggleScanner();
         },
         () => {}
       ).then(() => {
@@ -165,6 +194,7 @@
         alert("Kamera konnte nicht gestartet werden: " + err);
       });
     }
+    // <<< Performance-optimierter Scanner
   </script>
 </body>
 </html>
