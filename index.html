@@ -6,13 +6,13 @@
   <title>Growatt Retouren Scanner</title>
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <style>
-    body { font-family: sans-serif; background: #f0fff0; padding: 20px; } /* leicht grünlicher Hintergrund */
+    body { font-family: sans-serif; background: #f0fff0; padding: 20px; }
     .container { max-width: 600px; margin: auto; background: white; border-radius: 12px; padding: 20px; box-shadow: 0 0 20px rgba(0,128,0,0.1); }
     h2 { text-align: center; margin-bottom: 20px; color: #008000; }
     button, select, input { font-size: 16px; margin: 10px 0; width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ccc; }
     table { width: 100%; border-collapse: collapse; margin-top: 20px; }
     th, td { text-align: left; padding: 8px; border: 1px solid #ddd; }
-    th { background-color: #e5ffe5; } /* hellgrün */
+    th { background-color: #e5ffe5; }
     .btn-main { background: #008000; color: white; border: none; cursor: pointer; }
     .btn-main:hover { background: #006400; }
     #reader { width: 100%; margin-top: 20px; display: none; }
@@ -20,7 +20,7 @@
 </head>
 <body>
   <div class="container">
-    <h2>Growatt Retouren scannen</h2>
+    <h2>Growatt Retouren</h2>
 
     <button class="btn-main" onclick="toggleScanner('Seriennummer')">≣ Seriennummer scannen</button>
     <div id="reader"></div>
@@ -28,7 +28,6 @@
     <label>Seriennummer:</label>
     <input type="text" id="Seriennummer" placeholder="Barcode hier scannen oder eingeben" />
 
-    <!-- 1) Artikel zuerst -->
     <label>Artikel:</label>
     <select id="artikel">
       <option value="" disabled selected>Bitte wählen…</option>
@@ -43,7 +42,6 @@
       <option>NEO 16000</option>
     </select>
 
-    <!-- 2) Danach Grund mit Platzhalter -->
     <label>Grund der Rücksendung:</label>
     <select id="dienstleister">
       <option value="" disabled selected>Bitte wählen…</option>
@@ -83,7 +81,7 @@
     function addEntry() {
       const sn = document.getElementById("Seriennummer").value.trim();
       const artikel = document.getElementById("artikel").value;
-      const dl = document.getElementById("dienstleister").value; // Grund
+      const dl = document.getElementById("dienstleister").value;
       const datum = new Date().toLocaleDateString("de-DE");
 
       if (!sn || !artikel || !dl) {
@@ -94,7 +92,6 @@
       data.push({ datum, sn, dl, artikel });
 
       const row = document.createElement("tr");
-      // Reihenfolge: Datum | Artikel | Seriennummer | Grund
       row.innerHTML = `<td>${datum}</td><td>${artikel}</td><td>${sn}</td><td>${dl}</td>`;
       listBody.appendChild(row);
 
@@ -106,11 +103,10 @@
     function generatePDF() {
       const doc = new window.jspdf.jsPDF();
       doc.setFontSize(16);
-      doc.setTextColor(0, 128, 0); // grün
+      doc.setTextColor(0, 128, 0);
       doc.text("Growatt Retouren", 105, 20, null, null, "center");
       doc.setTextColor(0, 0, 0);
 
-      // Header exakt wie gewünscht
       const headers = [["DATUM", "ARTIKEL", "SERIENNUMMER", "GRUND"]];
       const rows = data.map(entry => [entry.datum, entry.artikel, entry.sn, entry.dl]);
 
@@ -119,13 +115,9 @@
         body: rows,
         startY: 30,
         styles: { fontSize: 10, cellPadding: 3 },
-        headStyles: { fillColor: [229, 255, 229], textColor: [0, 0, 0] }, // hellgrün
+        headStyles: { fillColor: [229, 255, 229], textColor: [0, 0, 0] },
         margin: { top: 25 }
       });
-
-      const pageHeight = doc.internal.pageSize.height;
-      doc.setFontSize(12);
-      doc.text("Unterschrift Fahrer: _________________________________", 14, pageHeight - 20);
 
       const filename = `growatt_retouren_${new Date().toISOString().split('T')[0]}.pdf`;
       doc.save(filename);
@@ -137,9 +129,7 @@
       el.value = value;
     }
 
-    // >>> Performance-optimierter Scanner für 1D-Barcodes
     function toggleScanner(fieldId) {
-      // Bereits aktiv? -> stoppen
       if (scannerRunning && html5QrCode) {
         html5QrCode.stop().then(() => {
           scannerRunning = false;
@@ -148,19 +138,16 @@
         return;
       }
 
-      // Start
       scanTarget = fieldId || "Seriennummer";
       const readerElem = document.getElementById("reader");
       html5QrCode = new Html5Qrcode("reader");
       readerElem.style.display = "block";
 
-      // Breite, flache Scanbox für 1D-Barcodes
       const qrbox = { width: 500, height: 180 };
-
       const config = {
         fps: 30,
         qrbox,
-        aspectRatio: 1.7778, // 16:9 begünstigt Autofokus
+        aspectRatio: 1.7778,
         rememberLastUsedCamera: true,
         experimentalFeatures: { useBarCodeDetectorIfSupported: true },
         formatsToSupport: [
@@ -170,7 +157,6 @@
           Html5QrcodeSupportedFormats.EAN_8,
           Html5QrcodeSupportedFormats.QR_CODE
         ],
-        // Höhere Auflösung + Autofokus (falls vom Browser umgesetzt)
         videoConstraints: {
           facingMode: { ideal: "environment" },
           width: { ideal: 1920 },
@@ -184,8 +170,7 @@
         config,
         (decodedText) => {
           setFieldValue(scanTarget, decodedText);
-          // Nach erstem Treffer sofort schließen
-          toggleScanner();
+          toggleScanner(); // sofort schließen
         },
         () => {}
       ).then(() => {
@@ -194,7 +179,6 @@
         alert("Kamera konnte nicht gestartet werden: " + err);
       });
     }
-    // <<< Performance-optimierter Scanner
   </script>
 </body>
 </html>
