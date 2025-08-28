@@ -28,7 +28,7 @@
     <label>Seriennummer:</label>
     <input type="text" id="Seriennummer" placeholder="Barcode hier scannen oder eingeben" />
 
-    <!-- Zuerst Artikel -->
+    <!-- 1) Artikel zuerst -->
     <label>Artikel:</label>
     <select id="artikel">
       <option value="" disabled selected>Bitte wählen…</option>
@@ -43,9 +43,10 @@
       <option>NEO 16000</option>
     </select>
 
-    <!-- Danach Grund -->
+    <!-- 2) Danach Grund mit Platzhalter -->
     <label>Grund der Rücksendung:</label>
     <select id="dienstleister">
+      <option value="" disabled selected>Bitte wählen…</option>
       <option value="Defekt">Defekt</option>
       <option value="Keine Spannung">Keine Spannung</option>
       <option value="Keine Funktion">Keine Funktion</option>
@@ -81,12 +82,12 @@
 
     function addEntry() {
       const sn = document.getElementById("Seriennummer").value.trim();
-      const dl = document.getElementById("dienstleister").value;
       const artikel = document.getElementById("artikel").value;
+      const dl = document.getElementById("dienstleister").value; // Grund
       const datum = new Date().toLocaleDateString("de-DE");
 
-      if (!sn || !artikel) {
-        alert("Bitte Seriennummer und Artikel wählen/ausfüllen.");
+      if (!sn || !artikel || !dl) {
+        alert("Bitte Seriennummer, Artikel und Grund wählen/ausfüllen.");
         return;
       }
 
@@ -99,6 +100,7 @@
 
       document.getElementById("Seriennummer").value = "";
       document.getElementById("artikel").value = "";
+      document.getElementById("dienstleister").value = "";
     }
 
     function generatePDF() {
@@ -108,7 +110,7 @@
       doc.text("Growatt Retouren", 105, 20, null, null, "center");
       doc.setTextColor(0, 0, 0);
 
-      // Header mit "Grund" statt "Grund der Rücksendung"
+      // Header exakt wie gewünscht
       const headers = [["DATUM", "ARTIKEL", "SERIENNUMMER", "GRUND"]];
       const rows = data.map(entry => [entry.datum, entry.artikel, entry.sn, entry.dl]);
 
