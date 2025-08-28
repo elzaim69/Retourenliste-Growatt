@@ -20,7 +20,7 @@
 </head>
 <body>
   <div class="container">
-    <h2>Growatt Retouren</h2>
+    <h2>Growatt Retouren scannen</h2>
 
     <button class="btn-main" onclick="toggleScanner('Seriennummer')">≣ Seriennummer scannen</button>
     <div id="reader"></div>
@@ -28,15 +28,7 @@
     <label>Seriennummer:</label>
     <input type="text" id="Seriennummer" placeholder="Barcode hier scannen oder eingeben" />
 
-    <label>Grund der Rücksendung:</label>
-    <select id="dienstleister">
-      <option value="Defekt">Defekt</option>
-      <option value="Keine Spannung">Keine Spannung</option>
-      <option value="Keine Funktion">Keine Funktion</option>
-      <option value="Laut Kunde defekt">Laut Kunde defekt</option>
-      <option value="schaltet zwischendurch ab">schaltet zwischendurch ab</option>
-    </select>
-
+    <!-- Zuerst Artikel -->
     <label>Artikel:</label>
     <select id="artikel">
       <option value="" disabled selected>Bitte wählen…</option>
@@ -51,6 +43,16 @@
       <option>NEO 16000</option>
     </select>
 
+    <!-- Danach Grund -->
+    <label>Grund der Rücksendung:</label>
+    <select id="dienstleister">
+      <option value="Defekt">Defekt</option>
+      <option value="Keine Spannung">Keine Spannung</option>
+      <option value="Keine Funktion">Keine Funktion</option>
+      <option value="Laut Kunde defekt">Laut Kunde defekt</option>
+      <option value="schaltet zwischendurch ab">schaltet zwischendurch ab</option>
+    </select>
+
     <button class="btn-main" onclick="addEntry()">Hinzufügen</button>
 
     <table id="list">
@@ -59,7 +61,7 @@
           <th>Datum</th>
           <th>Artikel</th>
           <th>Seriennummer</th>
-          <th>Grund der Rücksendung</th>
+          <th>Grund</th>
         </tr>
       </thead>
       <tbody></tbody>
@@ -106,9 +108,8 @@
       doc.text("Growatt Retouren", 105, 20, null, null, "center");
       doc.setTextColor(0, 0, 0);
 
-      // Reihenfolge Header wie gewünscht
-      const headers = [["DATUM", "ARTIKEL", "SERIENNUMMER", "GRUND DER RÜCKSENDUNG"]];
-      // Reihenfolge Daten entsprechend
+      // Header mit "Grund" statt "Grund der Rücksendung"
+      const headers = [["DATUM", "ARTIKEL", "SERIENNUMMER", "GRUND"]];
       const rows = data.map(entry => [entry.datum, entry.artikel, entry.sn, entry.dl]);
 
       doc.autoTable({
