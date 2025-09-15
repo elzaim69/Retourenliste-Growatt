@@ -32,4 +32,224 @@
 
     <label>Artikel:</label>
     <select id="artikel">
-      <option value="" disabled selected>Bi
+      <option value="" disabled selected>Bitte wählen…</option>
+      <option>MIC 800</option>
+      <option>MIC 1000</option>
+      <option>MIC 1500</option>
+      <option>MIC 2000</option>
+      <option>MIC 2500</option>
+      <option>MIC 3000</option>
+      <option>NEO 800</option>
+      <option>NEO 1000</option>
+      <option>NEO 16000</option>
+      <option>NOAH 2000</option>
+      <option>NEXA 2000</option>
+      <option>NEXA EXTENSION</option>
+    </select>
+
+    <label>Grund der Rücksendung:</label>
+    <select id="dienstleister">
+      <option value="" disabled selected>Bitte wählen…</option>
+      <option value="Defekt">Defekt</option>
+      <option value="Keine Spannung">Keine Spannung</option>
+      <option value="Keine Funktion">Keine Funktion</option>
+      <option value="Laut Kunde defekt">Laut Kunde defekt</option>
+      <option value="schaltet zwischendurch ab">schaltet zwischendurch ab</option>
+    </select>
+
+    <button class="btn-main" onclick="addEntry()">Hinzufügen</button>
+
+    <table id="list">
+      <thead>
+        <tr>
+          <th>Datum</th>
+          <th>Artikel</th>
+          <th>Seriennummer</th>
+          <th>Grund</th>
+          <th style="width:60px;">Aktion</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <button class="btn-main" onclick="generatePDF()">PDF erzeugen</button>
+    <button class="btn-main" onclick="generateExcel()">Excel erzeugen</button>
+  </div>
+
+  <!-- Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+  <script>
+    const listBody = document.querySelector("#list tbody");
+    const data = []; // {datum, artikel, sn, dl}
+    let scanTarget = "Seriennummer";
+
+    // html5-qrcode Instanz/Status
+    let html5QrCode = null;
+    let scannerRunning = false;
+
+    function addEntry() {
+      const sn = document.getElementById("Seriennummer").value.trim();
+      const artikel = document.getElementById("artikel").value;
+      const dl = document.getElementById("dienstleister").value; // Grund
+      const datum = new Date().toLocaleDateString("de-DE");
+
+      if (!sn || !artikel || !dl) {
+        alert("Bitte Seriennummer, Artikel und Grund wählen/ausfüllen.");
+        return;
+      }
+
+      data.push({ datum, artikel, sn, dl });
+      renderTable();
+
+      document.getElementById("Seriennummer").value = "";
+      document.getElementById("artikel").value = "";
+      document.getElementById("dienstleister").value = "";
+    }
+
+    function deleteEntry(index) {
+      if (index < 0 || index >= data.length) return;
+      data.splice(index, 1);
+      renderTable();
+    }
+
+    function renderTable() {
+      listBody.innerHTML = "";
+      data.forEach((entry, idx) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${entry.datum}</td>
+          <td>${entry.artikel}</td>
+          <td>${entry.sn}</td>
+          <td>${entry.dl}</td>
+          <td><button class="icon-btn" title="Eintrag entfernen" aria-label="Eintrag entfernen" onclick="deleteEntry(${idx})">✖</button></td>
+        `;
+        listBody.appendChild(tr);
+      });
+    }
+
+    function generatePDF() {
+      if (data.length === 0) { alert("Keine Daten zum Exportieren vorhanden."); return; }
+      const doc = new window.jspdf.jsPDF();
+      doc.setFontSize(16);
+      doc.setTextColor(0, 128, 0);
+      doc.text("Growatt Retouren", 105, 20, null, null, "center");
+      doc.setTextColor(0, 0, 0);
+      const headers = [["DATUM", "ARTIKEL", "SERIENNUMMER", "GRUND"]];
+      const rows = data.map(e => [e.datum, e.artikel, e.sn, e.dl]);
+      doc.autoTable({
+        head: headers,
+        body: rows,
+        startY: 30,
+        styles: { fontSize: 10, cellPadding: 3 },
+        headStyles: { fillColor: [229, 255, 229], textColor: [0, 0, 0] },
+        margin: { top: 25 }
+      });
+      const filename = `growatt_retouren_${new Date().toISOString().split('T')[0]}.pdf`;
+      doc.save(filename);
+    }
+
+    function generateExcel() {
+      if (data.length === 0) { alert("Keine Daten zum Exportieren vorhanden."); return; }
+      const worksheetData = [
+        ["DATUM", "ARTIKEL", "SERIENNUMMER", "GRUND"],
+        ...data.map(e => [e.datum, e.artikel, e.sn, e.dl])
+      ];
+      const ws = XLSX.utils.aoa_to_sheet(worksheetData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Growatt Retouren");
+      XLSX.writeFile(wb, `growatt_retouren_${new Date().toISOString().split('T')[0]}.xlsx`);
+    }
+
+    function setFieldValue(fieldId, value) {
+      const el = document.getElementById(fieldId);
+      if (!el) return;
+      el.value = value;
+    }
+
+    // ----------- STABILER SCANNER AUF BASIS HTML5-QR-CODE -----------
+    function toggleScanner(fieldId) {
+      const readerElem = document.getElementById("reader");
+      const scanBtn = document.getElementById("scanBtn");
+
+      if (scannerRunning && html5QrCode) {
+        html5QrCode.stop().then(() => {
+          html5QrCode.clear();
+          scannerRunning = false;
+          readerElem.style.display = "none";
+          scanBtn.textContent = "≣ Seriennummer scannen";
+        }).catch(() => {
+          scannerRunning = false;
+          readerElem.style.display = "none";
+          scanBtn.textContent = "≣ Seriennummer scannen";
+        });
+        return;
+      }
+
+      scanTarget = fieldId || "Seriennummer";
+      readerElem.style.display = "block";
+      scanBtn.textContent = "⏹️ Scanner stoppen";
+
+      if (!html5QrCode) {
+        html5QrCode = new Html5Qrcode("reader");
+      } else {
+        try { html5QrCode.clear(); } catch {}
+      }
+
+      // Breite, flache Scanbox – ideal für 1D Barcodes
+      const qrbox = { width: Math.min(500, readerElem.clientWidth - 20), height: 180 };
+
+      // Schutz: Wenn die Format-Enums nicht da sind (ältere Builds), fallback ohne formatsToSupport
+      let config = {
+        fps: 30,
+        qrbox,
+        aspectRatio: 1.7778,
+        rememberLastUsedCamera: true,
+        disableFlip: true,
+        supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
+        showTorchButtonIfSupported: true,
+        videoConstraints: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        }
+      };
+
+      try {
+        // Optionales Whitelisting (falls Enums vorhanden)
+        if (window.Html5QrcodeSupportedFormats) {
+          config.formatsToSupport = [
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.QR_CODE
+          ];
+        }
+      } catch {}
+
+      html5QrCode.start(
+        { facingMode: "environment" },
+        config,
+        (decodedText) => {
+          setFieldValue(scanTarget, decodedText);
+          // Sofort schließen nach Treffer
+          toggleScanner();
+        },
+        // Fehler pro Frame ignorieren (Rauschen), kein Alert-Spam
+        () => {}
+      ).then(() => {
+        scannerRunning = true;
+      }).catch(err => {
+        scannerRunning = false;
+        readerElem.style.display = "none";
+        scanBtn.textContent = "≣ Seriennummer scannen";
+        alert("Kamera konnte nicht gestartet werden: " + err);
+      });
+    }
+    // -----------------------------------------------------------------
+  </script>
+</body>
+</html>
