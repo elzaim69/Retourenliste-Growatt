@@ -15,10 +15,12 @@
     th { background-color: #e5ffe5; }
     .btn-main { background: #008000; color: white; border: none; cursor: pointer; }
     .btn-main:hover { background: #006400; }
-    #reader { width: 100%; margin-top: 20px; display: none; }
-    /* Minimaler, unaufdringlicher Icon-Button für Entfernen */
+    #reader { width: 100%; margin-top: 12px; display: none; }
     .icon-btn { background: transparent; border: none; cursor: pointer; font-size: 18px; line-height: 1; padding: 4px 8px; }
     .icon-btn:hover { opacity: 0.8; }
+    /* Pro-Scanner Video reduziert anzeigen, aber groß genug für Fokus */
+    #proVideo { width: 100%; max-height: 320px; border-radius: 8px; display: none; border: 1px solid #ccc; }
+    .scan-controls { display: none; gap: 8px; margin-bottom: 8px; }
   </style>
 </head>
 <body>
@@ -26,6 +28,15 @@
     <h2>Growatt Retouren</h2>
 
     <button class="btn-main" onclick="toggleScanner('Seriennummer')">≣ Seriennummer scannen</button>
+    <!-- Pro-Scanner Oberfläche -->
+    <div class="scan-controls" id="scanControls">
+      <button class="btn-main" id="torchBtn" onclick="toggleTorch()" disabled>🔦 Taschenlampe</button>
+      <button class="btn-main" onclick="stopProScanner()">⏹️ Stop</button>
+      <small id="scanHint" style="margin-left:8px;">Tipp: aufs Video tippen für Autofokus</small>
+    </div>
+    <video id="proVideo" autoplay playsinline></video>
+
+    <!-- Fallback-Scanner -->
     <div id="reader"></div>
 
     <label>Seriennummer:</label>
@@ -45,7 +56,7 @@
       <option>NEO 16000</option>
       <option>NOAH 2000</option>
       <option>NEXA 2000</option>
-      <option>NEXA EXTESION</option>
+      <option>NEXA EXTENSION</option>
     </select>
 
     <label>Grund der Rücksendung:</label>
@@ -85,9 +96,19 @@
   <script>
     const listBody = document.querySelector("#list tbody");
     const data = []; // {datum, artikel, sn, dl}
-    let html5QrCode;
-    let scannerRunning = false;
     let scanTarget = "Seriennummer";
+
+    // Pro-Scanner Variablen
+    let stream = null;
+    let track = null;
+    let detector = null;
+    let rafId = null;
+    let torchOn = false;
+    let usingProScanner = false;
+
+    // Fallback html5-qrcode
+    let html5QrCode = null;
+    let scannerRunning = false;
 
     function addEntry() {
       const sn = document.getElementById("Seriennummer").value.trim();
@@ -108,14 +129,12 @@
       document.getElementById("dienstleister").value = "";
     }
 
-    // Minimalistische Einzel-Löschung
     function deleteEntry(index) {
       if (index < 0 || index >= data.length) return;
       data.splice(index, 1);
       renderTable();
     }
 
-    // Einheitliches Rendern aus Daten-Array (verhindert Index-Verschiebungen)
     function renderTable() {
       listBody.innerHTML = "";
       data.forEach((entry, idx) => {
@@ -138,10 +157,8 @@
       doc.setTextColor(0, 128, 0);
       doc.text("Growatt Retouren", 105, 20, null, null, "center");
       doc.setTextColor(0, 0, 0);
-
       const headers = [["DATUM", "ARTIKEL", "SERIENNUMMER", "GRUND"]];
       const rows = data.map(e => [e.datum, e.artikel, e.sn, e.dl]);
-
       doc.autoTable({
         head: headers,
         body: rows,
@@ -150,7 +167,6 @@
         headStyles: { fillColor: [229, 255, 229], textColor: [0, 0, 0] },
         margin: { top: 25 }
       });
-
       const filename = `growatt_retouren_${new Date().toISOString().split('T')[0]}.pdf`;
       doc.save(filename);
     }
@@ -173,21 +189,133 @@
       el.value = value;
     }
 
-    // Performance-optimierter Scanner
-    function toggleScanner(fieldId) {
-      if (scannerRunning && html5QrCode) {
-        html5QrCode.stop().then(() => {
-          scannerRunning = false;
-          document.getElementById("reader").style.display = "none";
-        });
-        return;
-      }
+    // ===========================
+    // PRO-SCANNER (BarcodeDetector)
+    // ===========================
+    async function startProScanner(fieldId) {
+      stopFallbackScanner(); // sicherheitshalber
+      scanTarget = fieldId || "Seriennummer";
+      usingProScanner = true;
 
+      const video = document.getElementById("proVideo");
+      const controls = document.getElementById("scanControls");
+      const torchBtn = document.getElementById("torchBtn");
+
+      const constraints = {
+        audio: false,
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          frameRate: { ideal: 30 },
+          advanced: [{ focusMode: "continuous" }]
+        }
+      };
+
+      try {
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = stream;
+        video.style.display = "block";
+        controls.style.display = "flex";
+
+        track = stream.getVideoTracks()[0];
+
+        // Torch-Verfügbarkeit prüfen
+        const capabilities = track.getCapabilities ? track.getCapabilities() : {};
+        if (capabilities.torch) {
+          torchBtn.disabled = false;
+        } else {
+          torchBtn.disabled = true;
+        }
+
+        // BarcodeDetector initialisieren (1D + QR als Fallbackformat)
+        const formats = [
+          "code_128", "code_39", "ean_13", "ean_8", "qr_code"
+        ];
+        detector = 'BarcodeDetector' in window
+          ? new BarcodeDetector({ formats })
+          : null;
+
+        if (!detector) {
+          // Fallback auf html5-qrcode
+          stopProScanner();
+          startFallbackScanner(fieldId);
+          return;
+        }
+
+        // Tap-to-Focus
+        video.addEventListener("click", async () => {
+          try {
+            await track.applyConstraints({ advanced: [{ focusMode: "continuous" }] });
+          } catch {}
+        });
+
+        // Kontinuierlich Frames scannen
+        const scanFrame = async () => {
+          if (!usingProScanner) return;
+          try {
+            const barcodes = await detector.detect(video);
+            if (barcodes && barcodes.length > 0) {
+              const code = barcodes[0].rawValue;
+              setFieldValue(scanTarget, code);
+              stopProScanner(); // sofort nach Treffer
+              return;
+            }
+          } catch (e) {
+            // Wenn Detector fehlschlägt → Fallback
+            stopProScanner();
+            startFallbackScanner(fieldId);
+            return;
+          }
+          rafId = requestAnimationFrame(scanFrame);
+        };
+        rafId = requestAnimationFrame(scanFrame);
+
+      } catch (err) {
+        // Keine Kamera/Permission? → Fallback
+        stopProScanner();
+        startFallbackScanner(fieldId);
+      }
+    }
+
+    async function stopProScanner() {
+      usingProScanner = false;
+      const video = document.getElementById("proVideo");
+      const controls = document.getElementById("scanControls");
+      if (rafId) cancelAnimationFrame(rafId);
+      if (track) {
+        try { await track.applyConstraints({ advanced: [{ torch: false }] }); } catch {}
+        track.stop();
+      }
+      if (stream) stream.getTracks().forEach(t => t.stop());
+      stream = null; track = null; detector = null; rafId = null; torchOn = false;
+      video.srcObject = null;
+      video.style.display = "none";
+      controls.style.display = "none";
+    }
+
+    async function toggleTorch() {
+      if (!track || !track.getCapabilities) return;
+      const caps = track.getCapabilities();
+      if (!caps.torch) return;
+      torchOn = !torchOn;
+      try {
+        await track.applyConstraints({ advanced: [{ torch: torchOn }] });
+      } catch (e) {
+        alert("Taschenlampe wird von diesem Gerät/Browser nicht unterstützt.");
+      }
+    }
+
+    // ===========================
+    // Fallback: html5-qrcode
+    // ===========================
+    function startFallbackScanner(fieldId) {
+      stopProScanner();
       scanTarget = fieldId || "Seriennummer";
       const readerElem = document.getElementById("reader");
-      html5QrCode = new Html5Qrcode("reader");
       readerElem.style.display = "block";
 
+      html5QrCode = new Html5Qrcode("reader");
       const qrbox = { width: 500, height: 180 };
       const config = {
         fps: 30,
@@ -215,14 +343,52 @@
         config,
         (decodedText) => {
           setFieldValue(scanTarget, decodedText);
-          toggleScanner(); // nach Treffer schließen
+          stopFallbackScanner();
         },
         () => {}
       ).then(() => {
         scannerRunning = true;
       }).catch(err => {
+        scannerRunning = false;
+        readerElem.style.display = "none";
         alert("Kamera konnte nicht gestartet werden: " + err);
       });
+    }
+
+    function stopFallbackScanner() {
+      const readerElem = document.getElementById("reader");
+      if (scannerRunning && html5QrCode) {
+        html5QrCode.stop().then(() => {
+          scannerRunning = false;
+          readerElem.style.display = "none";
+          html5QrCode.clear();
+        }).catch(() => {
+          scannerRunning = false;
+          readerElem.style.display = "none";
+        });
+      } else {
+        readerElem.style.display = "none";
+      }
+    }
+
+    // Einheitlicher Einstiegspunkt für den Button
+    function toggleScanner(fieldId) {
+      // Falls Pro-Scanner aktiv → stoppen
+      if (usingProScanner) {
+        stopProScanner();
+        return;
+      }
+      // Falls Fallback aktiv → stoppen
+      if (scannerRunning) {
+        stopFallbackScanner();
+        return;
+      }
+      // Start: Pro-Scanner bevorzugt, sonst Fallback
+      if ('BarcodeDetector' in window) {
+        startProScanner(fieldId);
+      } else {
+        startFallbackScanner(fieldId);
+      }
     }
   </script>
 </body>
