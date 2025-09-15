@@ -54,7 +54,7 @@
       <option value="Keine Spannung">Keine Spannung</option>
       <option value="Keine Funktion">Keine Funktion</option>
       <option value="Laut Kunde defekt">Laut Kunde defekt</option>
-      <option value="Software Probleme">schaltet zwischendurch ab</option>
+      <option value="schaltet zwischendurch ab">schaltet zwischendurch ab</option>
     </select>
 
     <button class="btn-main" onclick="addEntry()">Hinzufügen</button>
@@ -169,6 +169,14 @@
       el.value = value;
     }
 
+    // Haptik-Helfer: kurzer Vibrationsimpuls, wenn unterstützt
+    function hapticPulse() {
+      if (navigator && typeof navigator.vibrate === "function") {
+        // ein kurzer, aber klar spürbarer Impuls
+        navigator.vibrate(60);
+      }
+    }
+
     // ----------- STABILER SCANNER AUF BASIS HTML5-QR-CODE -----------
     function toggleScanner(fieldId) {
       const readerElem = document.getElementById("reader");
@@ -198,10 +206,8 @@
         try { html5QrCode.clear(); } catch {}
       }
 
-      // Breite, flache Scanbox – ideal für 1D Barcodes
       const qrbox = { width: Math.min(500, readerElem.clientWidth - 20), height: 180 };
 
-      // Schutz: Wenn die Format-Enums nicht da sind (ältere Builds), fallback ohne formatsToSupport
       let config = {
         fps: 30,
         qrbox,
@@ -218,7 +224,6 @@
       };
 
       try {
-        // Optionales Whitelisting (falls Enums vorhanden)
         if (window.Html5QrcodeSupportedFormats) {
           config.formatsToSupport = [
             Html5QrcodeSupportedFormats.CODE_128,
@@ -234,12 +239,11 @@
         { facingMode: "environment" },
         config,
         (decodedText) => {
+          hapticPulse();                                 // <-- VIBRATION
           setFieldValue(scanTarget, decodedText);
-          // Sofort schließen nach Treffer
-          toggleScanner();
+          toggleScanner(); // nach Treffer schließen
         },
-        // Fehler pro Frame ignorieren (Rauschen), kein Alert-Spam
-        () => {}
+        () => {} // Frame-Fehler ignorieren
       ).then(() => {
         scannerRunning = true;
       }).catch(err => {
